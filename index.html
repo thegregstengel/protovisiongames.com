@@ -12,14 +12,13 @@
       background: #000;
       color: #00ff41;
       font-family: 'VT323', 'Courier New', monospace;
-      font-size: 1.4rem;
-      line-height: 1.6;
+      font-size: 1.5rem;
+      line-height: 1.7;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 2rem;
-      overflow-x: hidden;
     }
 
     /* CRT scanlines */
@@ -38,12 +37,12 @@
       z-index: 100;
     }
 
-    /* CRT flicker */
+    /* CRT vignette */
     body::after {
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.5) 100%);
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
       pointer-events: none;
       z-index: 99;
       animation: flicker 8s infinite;
@@ -57,53 +56,39 @@
     }
 
     .terminal {
-      max-width: 720px;
+      max-width: 520px;
       width: 100%;
       text-shadow: 0 0 8px #00ff41, 0 0 2px #00ff41;
     }
 
-    .ascii-header {
-      white-space: pre;
-      font-size: 1rem;
-      line-height: 1.2;
-      margin-bottom: 2rem;
-      opacity: 0.9;
-    }
-
-    .prompt { color: #00ff41; }
-    .dim { color: #007a1f; }
-    .bright { color: #80ffaa; }
-
-    .section { margin: 1.5rem 0; }
-
-    .game-list { margin: 0.5rem 0 0.5rem 2rem; }
+    .game-list { margin-bottom: 1.5rem; }
     .game-list li {
       list-style: none;
-      padding: 0.1rem 0;
       color: #00cc34;
     }
     .game-list li::before { content: '> '; color: #007a1f; }
 
     .game-list li.available {
       color: #80ffaa;
-      font-size: 1.5rem;
       text-shadow: 0 0 12px #00ff41, 0 0 4px #80ffaa;
     }
     .game-list li.available::before { content: '> '; color: #00ff41; }
     .game-list li.available a {
       color: inherit;
       text-decoration: none;
-      border-bottom: 1px solid #00ff41;
+      border-bottom: 1px solid rgba(0,255,65,0.4);
     }
     .game-list li.available a:hover {
       color: #fff;
       text-shadow: 0 0 16px #00ff41, 0 0 6px #fff;
     }
 
+    .prompt { color: #007a1f; }
+
     .cursor {
       display: inline-block;
       width: 0.6em;
-      height: 1.1em;
+      height: 1em;
       background: #00ff41;
       vertical-align: text-bottom;
       animation: blink 1s step-end infinite;
@@ -115,55 +100,13 @@
       50% { opacity: 0; }
     }
 
-    .divider {
-      border: none;
-      border-top: 1px solid #007a1f;
-      margin: 1rem 0;
-      box-shadow: 0 0 4px #007a1f;
-    }
-
-    .tagline {
-      margin-top: 2rem;
-      color: #007a1f;
-      font-size: 1.1rem;
-    }
-
     @media (max-width: 600px) {
-      body { font-size: 1.1rem; padding: 1rem; }
-      .ascii-header { font-size: 0.65rem; }
+      body { font-size: 1.2rem; padding: 1.5rem; }
     }
   </style>
 </head>
 <body>
   <div class="terminal">
-
-    <div class="ascii-header dim">
-██████╗ ██████╗  ██████╗ ████████╗ ██████╗ ██╗   ██╗██╗███████╗██╗ ██████╗ ███╗   ██╗
-██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██║   ██║██║██╔════╝██║██╔═══██╗████╗  ██║
-██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║   ██║██║███████╗██║██║   ██║██╔██╗ ██║
-██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║╚██╗ ██╔╝██║╚════██║██║██║   ██║██║╚██╗██║
-██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝ ╚████╔╝ ██║███████║██║╚██████╔╝██║ ╚████║
-╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝   ╚═══╝  ╚═╝╚══════╝╚═╝ ╚═════╝╚═╝  ╚═══╝
-                                         ██████╗  █████╗ ███╗   ███╗███████╗███████╗
-                                        ██╔════╝ ██╔══██╗████╗ ████║██╔════╝██╔════╝
-                                        ██║  ███╗███████║██╔████╔██║█████╗  ███████╗
-                                        ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ╚════██║
-                                        ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗███████║
-                                         ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝
-    </div>
-
-    <div class="section">
-      <span class="dim">LOGON: </span><span class="bright">JOSHUA</span><br>
-      <span class="dim">DATE: </span><span>1983.06.03 / 03:41:07 EST</span><br>
-      <span class="dim">GREETINGS. IDENTIFICATION CONFIRMED.</span>
-    </div>
-
-    <hr class="divider">
-
-    <div class="section">
-      <span class="dim">CATALOG QUERY: ALL TITLES</span><br>
-      <span class="dim">RETURNING </span><span>16</span><span class="dim"> RESULTS...</span>
-    </div>
 
     <ul class="game-list">
       <li>FALKEN'S MAZE</li>
@@ -182,17 +125,11 @@
       <li>THEATERWIDE BIOTOXIC AND CHEMICAL WARFARE</li>
       <li>GLOBAL THERMONUCLEAR WAR</li>
       <li class="available">
-        <a href="https://bigbangsmugglers.com" target="_blank" rel="noopener">
-          BIG BANG SMUGGLERS &mdash; [ AVAILABLE NOW ]
-        </a>
+        <a href="https://bigbangsmugglers.com" target="_blank" rel="noopener">BIG BANG SMUGGLERS</a>
       </li>
     </ul>
 
-    <hr class="divider">
-
-    <div class="tagline">
-      SHALL WE PLAY A GAME? <span class="cursor"></span>
-    </div>
+    <span class="prompt">SHALL WE PLAY A GAME? </span><span class="cursor"></span>
 
   </div>
 </body>
