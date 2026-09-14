@@ -8,11 +8,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html { background: #0a1a4a; }
+    html { background: #020308; }
 
     body {
-      background: #0a1a4a;
-      color: #a9cbff;
+      background: #020308;
+      color: #9ec9ff;
       font-family: 'VT323', 'Courier New', monospace;
       font-size: 1.5rem;
       line-height: 1.7;
@@ -30,8 +30,8 @@
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 0, 40, 0.18) 2px,
-        rgba(0, 0, 40, 0.18) 4px
+        rgba(0, 0, 0, 0.2) 2px,
+        rgba(0, 0, 0, 0.2) 4px
       );
       pointer-events: none;
       z-index: 100;
@@ -42,7 +42,7 @@
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,5,35,0.65) 100%);
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
       pointer-events: none;
       z-index: 99;
       animation: flicker 8s infinite;
@@ -58,8 +58,8 @@
     .terminal {
       max-width: 640px;
       width: 100%;
-      margin: 0 auto;
-      text-shadow: 0 0 8px #4d8dff, 0 0 2px #a9cbff;
+      margin: 0;               /* upper-left, like a real terminal */
+      text-shadow: 0 0 10px #3d8bff, 0 0 20px rgba(61,139,255,0.6), 0 0 2px #cfe4ff;
       white-space: pre-wrap;
       word-break: break-word;
       text-transform: uppercase;
@@ -68,22 +68,22 @@
     .terminal a {
       color: #e6f1ff;
       text-decoration: none;
-      border-bottom: 1px solid rgba(169,203,255,0.5);
-      text-shadow: 0 0 12px #4d8dff, 0 0 4px #e6f1ff;
+      border-bottom: 1px solid rgba(158,201,255,0.5);
+      text-shadow: 0 0 14px #3d8bff, 0 0 24px rgba(61,139,255,0.7), 0 0 4px #e6f1ff;
     }
     .terminal a:hover {
       color: #fff;
-      text-shadow: 0 0 16px #6fa8ff, 0 0 6px #fff;
+      text-shadow: 0 0 18px #6fa8ff, 0 0 30px rgba(111,168,255,0.8), 0 0 6px #fff;
     }
 
     .cursor {
       display: inline-block;
       width: 0.6em;
       height: 1em;
-      background: #a9cbff;
+      background: #9ec9ff;
       vertical-align: text-bottom;
       animation: blink 1s step-end infinite;
-      box-shadow: 0 0 6px #4d8dff;
+      box-shadow: 0 0 8px #3d8bff, 0 0 16px rgba(61,139,255,0.6);
     }
     .cursor.hidden { visibility: hidden; }
 

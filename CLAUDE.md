@@ -51,8 +51,9 @@ configured via `CNAME` file.
 - All changes go directly to `main`
 - Keep it minimal: one file, no libraries, no dependencies. The only JS is
   the inline terminal script.
-- Blue screen like the film's LOGON scene: light blue text (`#a9cbff`) on
-  dark navy (`#0a1a4a`). Not green.
+- Blue phosphor: glowing light-blue text (`#9ec9ff`, blue text-shadow bloom)
+  on near-black (`#020308`). Not green, not a navy background.
+- Prompt sits in the upper-left like a real terminal, not centered.
 - VT323 monospace font throughout
 - CRT scanline and vignette effects via CSS pseudo-elements
 
