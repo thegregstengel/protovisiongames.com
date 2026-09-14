@@ -8,17 +8,17 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { background: #0a1a4a; }
+
     body {
-      background: #000;
-      color: #00ff41;
+      background: #0a1a4a;
+      color: #a9cbff;
       font-family: 'VT323', 'Courier New', monospace;
       font-size: 1.5rem;
       line-height: 1.7;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       padding: 2rem;
+      cursor: text;
     }
 
     /* CRT scanlines */
@@ -30,8 +30,8 @@
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 0, 0, 0.15) 2px,
-        rgba(0, 0, 0, 0.15) 4px
+        rgba(0, 0, 40, 0.18) 2px,
+        rgba(0, 0, 40, 0.18) 4px
       );
       pointer-events: none;
       z-index: 100;
@@ -42,7 +42,7 @@
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,5,35,0.65) 100%);
       pointer-events: none;
       z-index: 99;
       animation: flicker 8s infinite;
@@ -56,48 +56,51 @@
     }
 
     .terminal {
-      max-width: 520px;
+      max-width: 640px;
       width: 100%;
-      text-shadow: 0 0 8px #00ff41, 0 0 2px #00ff41;
+      margin: 0 auto;
+      text-shadow: 0 0 8px #4d8dff, 0 0 2px #a9cbff;
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-transform: uppercase;
     }
 
-    .game-list { margin-bottom: 1.5rem; }
-    .game-list li {
-      list-style: none;
-      color: #00cc34;
-    }
-    .game-list li::before { content: '> '; color: #007a1f; }
-
-    .game-list li.available {
-      color: #80ffaa;
-      text-shadow: 0 0 12px #00ff41, 0 0 4px #80ffaa;
-    }
-    .game-list li.available::before { content: '> '; color: #00ff41; }
-    .game-list li.available a {
-      color: inherit;
+    .terminal a {
+      color: #e6f1ff;
       text-decoration: none;
-      border-bottom: 1px solid rgba(0,255,65,0.4);
+      border-bottom: 1px solid rgba(169,203,255,0.5);
+      text-shadow: 0 0 12px #4d8dff, 0 0 4px #e6f1ff;
     }
-    .game-list li.available a:hover {
+    .terminal a:hover {
       color: #fff;
-      text-shadow: 0 0 16px #00ff41, 0 0 6px #fff;
+      text-shadow: 0 0 16px #6fa8ff, 0 0 6px #fff;
     }
-
-    .prompt { color: #007a1f; }
 
     .cursor {
       display: inline-block;
       width: 0.6em;
       height: 1em;
-      background: #00ff41;
+      background: #a9cbff;
       vertical-align: text-bottom;
       animation: blink 1s step-end infinite;
-      box-shadow: 0 0 6px #00ff41;
+      box-shadow: 0 0 6px #4d8dff;
     }
+    .cursor.hidden { visibility: hidden; }
 
     @keyframes blink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
+    }
+
+    /* Off-screen input keeps the mobile keyboard available */
+    #kbd {
+      position: fixed;
+      top: 0; left: 0;
+      width: 1px; height: 1px;
+      opacity: 0;
+      border: 0;
+      padding: 0;
+      font-size: 16px; /* prevents iOS zoom on focus */
     }
 
     @media (max-width: 600px) {
@@ -107,30 +110,210 @@
 </head>
 <body>
   <div class="terminal">
-
-    <ul class="game-list">
-      <li>FALKEN'S MAZE</li>
-      <li>BLACK JACK</li>
-      <li>GIN RUMMY</li>
-      <li>HEARTS</li>
-      <li>BRIDGE</li>
-      <li>CHECKERS</li>
-      <li>CHESS</li>
-      <li>POKER</li>
-      <li>FIGHTER COMBAT</li>
-      <li>GUERRILLA ENGAGEMENT</li>
-      <li>DESERT WARFARE</li>
-      <li>AIR-TO-GROUND ACTIONS</li>
-      <li>THEATERWIDE TACTICAL WARFARE</li>
-      <li>THEATERWIDE BIOTOXIC AND CHEMICAL WARFARE</li>
-      <li>GLOBAL THERMONUCLEAR WAR</li>
-      <li class="available">
-        <a href="https://bigbangsmugglers.com" target="_blank" rel="noopener">BIG BANG SMUGGLERS</a>
-      </li>
-    </ul>
-
-    <span class="prompt">&gt; </span><span class="cursor"></span>
-
+    <div id="out"></div>
+    <div id="line"><span id="prompt">LOGON: </span><span id="typed"></span><span class="cursor" id="cursor"></span></div>
   </div>
+  <input id="kbd" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" aria-label="Terminal input">
+
+  <script>
+    (function () {
+      var out    = document.getElementById('out');
+      var line   = document.getElementById('line');
+      var typed  = document.getElementById('typed');
+      var cursor = document.getElementById('cursor');
+      var kbd    = document.getElementById('kbd');
+
+      var CHAR_MS = 28;      // type-out speed per character
+      var busy    = false;   // ignore input while WOPR is printing
+
+      // --- Sound: synthesized WOPR printout blip (Web Audio, no assets) ---
+      var AC  = window.AudioContext || window.webkitAudioContext;
+      var ctx = null;
+
+      function audioOn() {
+        if (!AC) return;
+        if (!ctx) ctx = new AC();
+        if (ctx.state === 'suspended') ctx.resume();
+      }
+
+      // One short chirp per printed character, like the film's teletype printout
+      function blip() {
+        if (!ctx || ctx.state !== 'running') return;
+        var t = ctx.currentTime;
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1400 + Math.random() * 500, t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.08, t + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.03);
+      }
+
+      // Carrier drop when the connection is terminated: falling tone into static
+      function carrierDrop() {
+        if (!ctx || ctx.state !== 'running') return;
+        var t = ctx.currentTime;
+        var osc = ctx.createOscillator();
+        var g = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(2100, t);
+        osc.frequency.exponentialRampToValueAtTime(300, t + 0.6);
+        g.gain.setValueAtTime(0.06, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.7);
+
+        var len = Math.floor(ctx.sampleRate * 0.9);
+        var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        var src = ctx.createBufferSource();
+        var ng = ctx.createGain();
+        src.buffer = buf;
+        ng.gain.setValueAtTime(0.05, t + 0.5);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+        src.connect(ng).connect(ctx.destination);
+        src.start(t + 0.5);
+      }
+
+      var GAMES = [
+        "FALKEN'S MAZE",
+        'BLACK JACK',
+        'GIN RUMMY',
+        'HEARTS',
+        'BRIDGE',
+        'CHECKERS',
+        'CHESS',
+        'POKER',
+        'FIGHTER COMBAT',
+        'GUERRILLA ENGAGEMENT',
+        'DESERT WARFARE',
+        'AIR-TO-GROUND ACTIONS',
+        'THEATERWIDE TACTICAL WARFARE',
+        'THEATERWIDE BIOTOXIC AND CHEMICAL WARFARE',
+        '',
+        'GLOBAL THERMONUCLEAR WAR',
+        '',
+        { text: 'BIG BANG SMUGGLERS', href: 'https://bigbangsmugglers.com' }
+      ];
+
+      function scrollDown() {
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      // Type one line (string or {text, href}) into #out, char by char.
+      function typeLine(item, done) {
+        var text = typeof item === 'string' ? item : item.text;
+        var row  = document.createElement('div');
+        var target = row;
+        if (typeof item !== 'string') {
+          var a = document.createElement('a');
+          a.href = item.href;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          row.appendChild(a);
+          target = a;
+        }
+        out.appendChild(row);
+        if (!text) { row.innerHTML = '&nbsp;'; scrollDown(); return setTimeout(done, CHAR_MS * 3); }
+        var i = 0;
+        (function tick() {
+          if (text[i] !== ' ') blip();
+          target.textContent = text.slice(0, ++i);
+          scrollDown();
+          if (i < text.length) setTimeout(tick, CHAR_MS);
+          else setTimeout(done, CHAR_MS);
+        })();
+      }
+
+      function typeLines(lines, done) {
+        var i = 0;
+        (function next() {
+          if (i >= lines.length) return done && done();
+          typeLine(lines[i++], next);
+        })();
+      }
+
+      function echo(cmd) {
+        var row = document.createElement('div');
+        row.textContent = 'LOGON: ' + cmd;
+        out.appendChild(row);
+      }
+
+      function respond(cmd) {
+        var key = cmd.replace(/\s+/g, ' ').trim().toUpperCase();
+        if (!key) return;
+
+        busy = true;
+        line.style.display = 'none';
+        echo(key);
+
+        var lines;
+        var terminate = false;
+
+        if (key === 'HELP LOGON') {
+          lines = ['', 'HELP NOT AVAILABLE', ''];
+        } else if (key === 'HELP GAMES') {
+          lines = ['', "'GAMES' REFERS TO MODELS, SIMULATIONS AND GAMES",
+                       'WHICH HAVE TACTICAL AND STRATEGIC APPLICATIONS.', ''];
+        } else if (key === 'LIST GAMES') {
+          lines = [''].concat(GAMES, ['']);
+        } else if (key === 'JOSHUA') {
+          lines = ['', 'GREETINGS PROFESSOR FALKEN.', '', 'SHALL WE PLAY A GAME?', ''].concat(GAMES, ['']);
+        } else {
+          lines = ['', 'IDENTIFICATION NOT RECOGNIZED BY SYSTEM', '--CONNECTION TERMINATED--'];
+          terminate = true;
+        }
+
+        typeLines(lines, function () {
+          if (terminate) {
+            // Carrier drop: blank the screen, then redial to a fresh LOGON:
+            carrierDrop();
+            setTimeout(function () {
+              out.innerHTML = '';
+              setTimeout(showPrompt, 1200);
+            }, 2000);
+          } else {
+            showPrompt();
+          }
+        });
+      }
+
+      function showPrompt() {
+        busy = false;
+        kbd.value = '';
+        typed.textContent = '';
+        line.style.display = '';
+        scrollDown();
+        kbd.focus();
+      }
+
+      kbd.addEventListener('input', function () {
+        if (busy) { kbd.value = ''; return; }
+        typed.textContent = kbd.value.toUpperCase();
+      });
+
+      kbd.addEventListener('keydown', function (e) {
+        audioOn();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!busy) respond(kbd.value);
+        }
+      });
+
+      // Any tap or click puts focus back on the terminal
+      document.addEventListener('pointerdown', function (e) {
+        audioOn();
+        if (e.target.closest('a')) return;
+        setTimeout(function () { kbd.focus(); }, 0);
+      });
+
+      kbd.focus();
+    })();
+  </script>
 </body>
 </html>

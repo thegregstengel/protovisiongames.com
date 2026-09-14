@@ -1,8 +1,11 @@
 # protovisiongames.com
 
 Protovision Games studio landing page. Retro terminal aesthetic inspired
-by WarGames. Lists fictional WOPR game titles with Big Bang Smugglers as
-the only real, clickable entry.
+by WarGames. Recreates Lightman's WOPR logon: a bare `LOGON:` prompt that
+answers HELP LOGON, HELP GAMES, LIST GAMES and JOSHUA exactly as the film
+does. Anything else gets "IDENTIFICATION NOT RECOGNIZED BY SYSTEM /
+--CONNECTION TERMINATED--" and the screen resets. The game list contains
+Big Bang Smugglers as the only real, clickable entry.
 
 ---
 
@@ -10,6 +13,7 @@ the only real, clickable entry.
 
 - Static HTML (single file, no build step)
 - CSS (inline in `<style>` tag)
+- Vanilla JS (inline `<script>`, drives the LOGON prompt)
 - Google Fonts (VT323)
 - GitHub Pages (hosting)
 - Zero dependencies
@@ -19,7 +23,7 @@ the only real, clickable entry.
 # Repo structure
 
 ```
-index.html     # The entire site (136 lines)
+index.html     # The entire site (HTML + CSS + JS)
 CNAME          # GitHub Pages custom domain (protovisiongames.com)
 .nojekyll      # Disables Jekyll processing on GitHub Pages
 README.md      # Minimal (just the repo name)
@@ -45,8 +49,10 @@ configured via `CNAME` file.
 # Conventions
 
 - All changes go directly to `main`
-- Keep it minimal: one file, no JS, no dependencies
-- Green phosphor color scheme (`#00ff41` on black)
+- Keep it minimal: one file, no libraries, no dependencies. The only JS is
+  the inline terminal script.
+- Blue screen like the film's LOGON scene: light blue text (`#a9cbff`) on
+  dark navy (`#0a1a4a`). Not green.
 - VT323 monospace font throughout
 - CRT scanline and vignette effects via CSS pseudo-elements
 
@@ -57,6 +63,15 @@ configured via `CNAME` file.
 - The entire site is one HTML file. Do not add a build step.
 - Only Big Bang Smugglers is a real link (points to bigbangsmugglers.com).
   All other game titles are decorative.
+- Recognized commands (case-insensitive): HELP LOGON, HELP GAMES,
+  LIST GAMES, JOSHUA. Add new ones in the `respond()` function. Keep the
+  film's wording verbatim.
+- Input comes from an off-screen `<input>` so the mobile keyboard opens;
+  any tap on the page refocuses it.
+- Sound is synthesized with the Web Audio API (per-character printout blip,
+  carrier-drop noise on disconnect). No audio files; the film's actual audio
+  is not shipped. Audio unlocks on the first keypress or tap per browser
+  autoplay rules.
 - Mobile breakpoint at 600px
 
 ---
