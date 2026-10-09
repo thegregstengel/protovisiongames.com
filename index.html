@@ -103,6 +103,36 @@
       font-size: 16px; /* prevents iOS zoom on focus */
     }
 
+    /* --- Tic-tac-toe screen (WOPR big board) --- */
+    #screen {
+      display: none;
+      width: min(100%, 380px);
+      margin: 0.5rem 0 1rem;
+      padding: 6%;
+      background: #000;
+      border: 3px solid #e4e9ff;
+      box-shadow: 0 0 12px rgba(158,201,255,0.5), inset 0 0 30px rgba(61,139,255,0.15);
+      cursor: default;
+    }
+    #screen.on { display: block; }
+    #screen.flash { background: #b8c4ff; }
+    #board { display: block; width: 100%; height: auto; }
+    #board .ink { stroke: #b8c4ff; stroke-width: 15; stroke-linecap: butt; fill: none;
+                  filter: drop-shadow(0 0 6px rgba(61,139,255,0.9)); }
+    #board .cell { fill: transparent; }
+    #board .cell.open { cursor: pointer; }
+
+    /* Film white-out overlay */
+    #white {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 200;
+      transition: opacity 0.6s linear;
+    }
+
     @media (max-width: 600px) {
       body { font-size: 1.2rem; padding: 1.5rem; }
     }
@@ -111,8 +141,10 @@
 <body>
   <div class="terminal">
     <div id="out"></div>
+    <div id="screen"><svg id="board" viewBox="0 0 300 300" aria-label="Tic-tac-toe board"></svg></div>
     <div id="line"><span id="prompt">LOGON: </span><span id="typed"></span><span class="cursor" id="cursor"></span></div>
   </div>
+  <div id="white"></div>
   <input id="kbd" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" aria-label="Terminal input">
 
   <script>
@@ -206,7 +238,8 @@
       }
 
       // Type one line (string or {text, href}) into #out, char by char.
-      function typeLine(item, done) {
+      function typeLine(item, done, ms) {
+        ms = ms || CHAR_MS;
         var text = typeof item === 'string' ? item : item.text;
         var row  = document.createElement('div');
         var target = row;
@@ -219,31 +252,339 @@
           target = a;
         }
         out.appendChild(row);
-        if (!text) { row.innerHTML = '&nbsp;'; scrollDown(); return setTimeout(done, CHAR_MS * 3); }
+        if (!text) { row.innerHTML = '&nbsp;'; scrollDown(); return setTimeout(done, ms * 3); }
         var i = 0;
         (function tick() {
           if (text[i] !== ' ') blip();
           target.textContent = text.slice(0, ++i);
           scrollDown();
-          if (i < text.length) setTimeout(tick, CHAR_MS);
-          else setTimeout(done, CHAR_MS);
+          if (i < text.length) setTimeout(tick, ms);
+          else setTimeout(done, ms);
         })();
       }
 
-      function typeLines(lines, done) {
+      function typeLines(lines, done, ms) {
         var i = 0;
         (function next() {
           if (i >= lines.length) return done && done();
-          typeLine(lines[i++], next);
+          typeLine(lines[i++], next, ms);
         })();
       }
 
+      var promptEl = document.getElementById('prompt');
+      var screen   = document.getElementById('screen');
+      var board    = document.getElementById('board');
+      var white    = document.getElementById('white');
+
+      // Terminal mode: 'logon' | 'players' | 'move' | 'again' | 'auto'
+      var mode    = 'logon';
+      var players = 0;
+      var cells   = [];      // 9 cells: 'X', 'O' or ''
+      var turn    = 'X';
+      var cpuTimer = null;   // pending computer move (1-player)
+      var gen      = 0;      // game generation; stale callbacks check it
+
+      function setPrompt(text) { promptEl.textContent = text; }
+
       function echo(cmd) {
         var row = document.createElement('div');
-        row.textContent = 'LOGON: ' + cmd;
+        row.textContent = promptEl.textContent + cmd;
         out.appendChild(row);
       }
 
+      // ---------- Tic-tac-toe: board drawing ----------
+      var LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+      function drawBoard() {
+        var svg = '';
+        // Grid, thick strokes like the WOPR big board
+        svg += '<line class="ink" x1="100" y1="8" x2="100" y2="292"/>';
+        svg += '<line class="ink" x1="200" y1="8" x2="200" y2="292"/>';
+        svg += '<line class="ink" x1="8" y1="100" x2="292" y2="100"/>';
+        svg += '<line class="ink" x1="8" y1="200" x2="292" y2="200"/>';
+        for (var i = 0; i < 9; i++) {
+          var cx = (i % 3) * 100 + 50, cy = Math.floor(i / 3) * 100 + 50;
+          if (cells[i] === 'X') {
+            svg += '<line class="ink" x1="' + (cx-33) + '" y1="' + (cy-33) + '" x2="' + (cx+33) + '" y2="' + (cy+33) + '"/>';
+            svg += '<line class="ink" x1="' + (cx+33) + '" y1="' + (cy-33) + '" x2="' + (cx-33) + '" y2="' + (cy+33) + '"/>';
+          } else if (cells[i] === 'O') {
+            svg += '<circle class="ink" cx="' + cx + '" cy="' + cy + '" r="33"/>';
+          }
+          var open = (mode === 'move' && !cells[i]) ? ' open' : '';
+          svg += '<rect class="cell' + open + '" data-i="' + i + '" x="' + (cx-50) + '" y="' + (cy-50) + '" width="100" height="100"/>';
+        }
+        board.innerHTML = svg;
+      }
+
+      function showBoard(on) { screen.classList.toggle('on', !!on); }
+
+      function clearCells() { cells = ['', '', '', '', '', '', '', '', '']; turn = 'X'; }
+
+      // ---------- Tic-tac-toe: rules ----------
+      function winner(b) {
+        for (var i = 0; i < LINES.length; i++) {
+          var l = LINES[i];
+          if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[1]] === b[l[2]]) return b[l[0]];
+        }
+        for (var j = 0; j < 9; j++) if (!b[j]) return null;
+        return 'DRAW';
+      }
+
+      function empties(b) {
+        var e = [];
+        for (var i = 0; i < 9; i++) if (!b[i]) e.push(i);
+        return e;
+      }
+
+      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+      // Easy opponent for 1-player: win if you can, block if you must,
+      // otherwise centre, then a corner, then whatever is left.
+      function easyMove(b, me) {
+        var them = me === 'X' ? 'O' : 'X';
+        var e = empties(b), i;
+        for (i = 0; i < e.length; i++) { b[e[i]] = me;   if (winner(b) === me)   { b[e[i]] = ''; return e[i]; } b[e[i]] = ''; }
+        for (i = 0; i < e.length; i++) { b[e[i]] = them; if (winner(b) === them) { b[e[i]] = ''; return e[i]; } b[e[i]] = ''; }
+        if (!b[4]) return 4;
+        var corners = [0, 2, 6, 8].filter(function (c) { return !b[c]; });
+        if (corners.length) return pick(corners);
+        return pick(e);
+      }
+
+      // Perfect play for 0-player: every game is a stalemate, as in the film.
+      function score(b, player, me) {
+        var w = winner(b);
+        if (w === me) return 1;
+        if (w === 'DRAW') return 0;
+        if (w) return -1;
+        var next = player === 'X' ? 'O' : 'X';
+        var best = player === me ? -2 : 2, e = empties(b);
+        for (var i = 0; i < e.length; i++) {
+          b[e[i]] = player;
+          var s = score(b, next, me);
+          b[e[i]] = '';
+          if (player === me ? s > best : s < best) best = s;
+        }
+        return best;
+      }
+
+      function perfectMove(b, me) {
+        var e = empties(b), best = -2, moves = [];
+        var next = me === 'X' ? 'O' : 'X';
+        for (var i = 0; i < e.length; i++) {
+          b[e[i]] = me;
+          var s = score(b, next, me);
+          b[e[i]] = '';
+          if (s > best) { best = s; moves = [e[i]]; }
+          else if (s === best) moves.push(e[i]);
+        }
+        return pick(moves);
+      }
+
+      // ---------- Tic-tac-toe: human games (1 or 2 players) ----------
+      function startTTT() {
+        setPrompt('NUMBER OF PLAYERS: ');
+        mode = 'players';
+        showPrompt();
+      }
+
+      function onPlayers(val) {
+        var n = val.trim();
+        echo(n);
+        if (n !== '0' && n !== '1' && n !== '2') {
+          busy = true; line.style.display = 'none';
+          typeLines(['', 'NUMBER OF PLAYERS MUST BE 0, 1 OR 2', ''], showPrompt);
+          return;
+        }
+        players = +n;
+        out.innerHTML = '';
+        clearCells();
+        var g = ++gen;
+        if (players === 0) return autoPlay();
+        mode = 'move';
+        showBoard(true);
+        drawBoard();
+        busy = true; line.style.display = 'none';
+        typeLines(['SQUARES ARE NUMBERED 1-9, LEFT TO RIGHT, TOP TO BOTTOM.', 'TYPE A NUMBER OR CLICK A SQUARE. ESC TO QUIT.', ''], function () { if (g === gen) movePrompt(); });
+      }
+
+      function movePrompt() {
+        mode = 'move';
+        setPrompt(players === 2 ? turn + ' MOVE: ' : 'YOUR MOVE: ');
+        drawBoard();
+        showPrompt();
+      }
+
+      function place(i) {
+        cells[i] = turn;
+        blip();
+        turn = turn === 'X' ? 'O' : 'X';
+        drawBoard();
+      }
+
+      function humanMove(i) {
+        if (mode !== 'move' || cells[i]) return;
+        echo(String(i + 1));
+        place(i);
+        if (finishIfOver()) return;
+        if (players === 1) {
+          busy = true; mode = 'wait'; line.style.display = 'none';
+          drawBoard();
+          var g = gen;
+          cpuTimer = setTimeout(function () {
+            cpuTimer = null;
+            if (g !== gen) return;
+            place(easyMove(cells, 'O'));
+            if (!finishIfOver()) movePrompt();
+          }, 500 + Math.random() * 400);
+        } else {
+          movePrompt();
+        }
+      }
+
+      function finishIfOver() {
+        var w = winner(cells);
+        if (!w) return false;
+        mode = 'over';
+        busy = true; line.style.display = 'none';
+        drawBoard();
+        var msg = w === 'DRAW' ? 'STALEMATE' : (players === 1 ? (w === 'X' ? 'YOU WIN' : 'I WIN') : w + ' WINS');
+        var g = gen;
+        typeLines(['', msg, ''], function () {
+          if (g !== gen) return;
+          setPrompt('PLAY AGAIN? (Y/N): ');
+          mode = 'again';
+          showPrompt();
+        });
+        return true;
+      }
+
+      function onAgain(k) {
+        if (k === 'Y') { echo('Y'); onPlayers(String(players)); }
+        else if (k === 'N') { echo('N'); backToLogon(); }
+      }
+
+      function backToLogon() {
+        gen++;
+        if (cpuTimer) { clearTimeout(cpuTimer); cpuTimer = null; }
+        showBoard(false);
+        out.innerHTML = '';
+        clearCells();
+        setPrompt('LOGON: ');
+        mode = 'logon';
+        showPrompt();
+      }
+
+      // ---------- Tic-tac-toe: zero players (Joshua plays itself) ----------
+      function autoBlip(freq) {
+        if (!ctx || ctx.state !== 'running') return;
+        var t = ctx.currentTime;
+        var osc = ctx.createOscillator(), gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.07, t + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.05);
+      }
+
+      function whiteoutTone() {
+        if (!ctx || ctx.state !== 'running') return;
+        var t = ctx.currentTime;
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, t);
+        osc.frequency.exponentialRampToValueAtTime(4000, t + 1.4);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.12, t + 1.2);
+        g.gain.setValueAtTime(0.12, t + 1.6);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 2.1);
+      }
+
+      var SCENARIOS = [
+        'U.S. FIRST STRIKE', 'USSR FIRST STRIKE', 'NATO / WARSAW PACT', 'FAR EAST STRATEGY',
+        'US USSR ESCALATION', 'MIDDLE EAST WAR', 'USSR CHINA ATTACK', 'INDIA PAKISTAN WAR',
+        'MEDITERRANEAN WAR', 'HONGKONG VARIANT', 'SEATO DECAPITATING', 'CUBAN PROVOCATION',
+        'ATLANTIC HEAVY', 'CUBAN PARAMILITARY', 'NICARAGUAN PREEMPTIVE', 'PACIFIC TERRITORIAL',
+        'BURMESE THEATERWIDE', 'ENGLISH THRUST', 'SUDAN SURPRISE', 'SUBSAHARAN THREAT'
+      ];
+
+      function autoPlay() {
+        mode = 'auto';
+        busy = true;
+        line.style.display = 'none';
+        showBoard(true);
+        var MAX_GAMES = 16;
+        var game = 0, delay = 380;
+
+        function playGame() {
+          clearCells();
+          drawBoard();
+          setTimeout(step, delay);
+        }
+
+        function step() {
+          var m = perfectMove(cells, turn);
+          cells[m] = turn;
+          turn = turn === 'X' ? 'O' : 'X';
+          drawBoard();
+          autoBlip(900 + game * 140 + Math.random() * 120);
+          if (winner(cells)) return gameOver();
+          setTimeout(step, delay);
+        }
+
+        function gameOver() {
+          game++;
+          screen.classList.add('flash');
+          setTimeout(function () { screen.classList.remove('flash'); }, Math.max(40, delay * 0.6));
+          if (game >= MAX_GAMES) return setTimeout(whiteout, 120);
+          delay = Math.max(14, delay * 0.78);
+          // The screen starts to bleach as the loop runs away
+          var bleed = game - (MAX_GAMES - 6);
+          if (bleed > 0) white.style.opacity = (bleed / 6) * 0.45;
+          setTimeout(playGame, Math.max(60, delay * 2.5));
+        }
+
+        function whiteout() {
+          whiteoutTone();
+          white.style.transition = 'opacity 1.4s ease-in';
+          white.style.opacity = '1';
+          setTimeout(function () {
+            // Hard cut to black, silence
+            showBoard(false);
+            out.innerHTML = '';
+            white.style.transition = 'none';
+            white.style.opacity = '0';
+            setTimeout(afterWhite, 1800);
+          }, 2600);
+        }
+
+        function afterWhite() {
+          // Joshua runs every war scenario. WINNER: NONE.
+          var lines = [];
+          for (var i = 0; i < SCENARIOS.length; i++) lines.push(SCENARIOS[i], 'WINNER: NONE', '');
+          typeLines(lines, function () {
+            setTimeout(function () {
+              out.innerHTML = '';
+              typeLines(['GREETINGS PROFESSOR FALKEN.', ''], function () {
+                setTimeout(function () {
+                  typeLines(['A STRANGE GAME.', 'THE ONLY WINNING MOVE IS', 'NOT TO PLAY.', '',
+                             'HOW ABOUT A NICE GAME OF CHESS?', ''], function () {
+                    setTimeout(backToLogon, 6000);
+                  }, CHAR_MS * 1.5);
+                }, 1500);
+              }, CHAR_MS * 1.5);
+            }, 1200);
+          }, 6);
+        }
+
+        playGame();
+      }
+
+      // ---------- LOGON command handling ----------
       function respond(cmd) {
         var key = cmd.replace(/\s+/g, ' ').trim().toUpperCase();
         if (!key) return;
@@ -264,6 +605,11 @@
           lines = [''].concat(GAMES, ['']);
         } else if (key === 'JOSHUA') {
           lines = ['', 'GREETINGS PROFESSOR FALKEN.', '', 'SHALL WE PLAY A GAME?', ''].concat(GAMES, ['']);
+        } else if (key === 'TIC-TAC-TOE' || key === 'TIC TAC TOE' || key === 'TICTACTOE') {
+          // Not on the menu. You just have to know.
+          lines = [''];
+          typeLines(lines, startTTT);
+          return;
         } else {
           lines = ['', 'IDENTIFICATION NOT RECOGNIZED BY SYSTEM', '--CONNECTION TERMINATED--'];
           terminate = true;
@@ -292,16 +638,44 @@
         kbd.focus();
       }
 
+      function onEnter(val) {
+        if (mode === 'logon')   return respond(val);
+        if (mode === 'players') return onPlayers(val);
+      }
+
+      // Single keypress modes: a digit plays a square, Y/N answers PLAY AGAIN?
+      function onKey(k) {
+        if (mode === 'move' && /^[1-9]$/.test(k)) { humanMove(+k - 1); return true; }
+        if (mode === 'again' && (k === 'Y' || k === 'N')) { onAgain(k); return true; }
+        return false;
+      }
+
+      board.addEventListener('click', function (e) {
+        var c = e.target.closest('.cell');
+        if (c) humanMove(+c.getAttribute('data-i'));
+      });
+
       kbd.addEventListener('input', function () {
         if (busy) { kbd.value = ''; return; }
+        if (mode === 'move' || mode === 'again') {
+          // Single-key modes (also covers mobile keyboards that don't fire keydown)
+          var k = kbd.value.slice(-1).toUpperCase();
+          kbd.value = '';
+          onKey(k);
+          return;
+        }
         typed.textContent = kbd.value.toUpperCase();
       });
 
       kbd.addEventListener('keydown', function (e) {
         audioOn();
+        if (e.key === 'Escape' && (mode === 'move' || mode === 'wait' || mode === 'again')) { e.preventDefault(); backToLogon(); return; }
+        if (busy) return;
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (!busy) respond(kbd.value);
+          onEnter(kbd.value);
+        } else if (e.key.length === 1 && onKey(e.key.toUpperCase())) {
+          e.preventDefault();
         }
       });
 

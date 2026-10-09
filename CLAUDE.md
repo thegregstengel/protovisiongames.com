@@ -65,8 +65,21 @@ configured via `CNAME` file.
 - Only Big Bang Smugglers is a real link (points to bigbangsmugglers.com).
   All other game titles are decorative.
 - Recognized commands (case-insensitive): HELP LOGON, HELP GAMES,
-  LIST GAMES, JOSHUA. Add new ones in the `respond()` function. Keep the
-  film's wording verbatim.
+  LIST GAMES, JOSHUA, TIC-TAC-TOE. Add new ones in the `respond()` function.
+  Keep the film's wording verbatim.
+- TIC-TAC-TOE (also TIC TAC TOE / TICTACTOE) is deliberately NOT in the
+  game list. You just have to know to type it. It asks NUMBER OF PLAYERS:
+  - 2: X and O alternate. Type a square number (1-9) or click a square.
+  - 1: you are X, Joshua is O (easy heuristic: win, block, centre, corner).
+  - 0: Joshua plays itself with perfect play (minimax), every game a
+    stalemate, faster each game, screen bleaches to white, then it cycles
+    the war scenarios (WINNER: NONE) and ends on "A STRANGE GAME..." before
+    returning to LOGON. Nothing is interruptible during this run.
+  - ESC quits a 1/2-player game back to LOGON. Y/N after a game is a single
+    keypress, as is a move; NUMBER OF PLAYERS needs Enter.
+- The board is an inline SVG drawn by `drawBoard()` (thick periwinkle
+  strokes on black in a white frame, like the WOPR big board). The white-out
+  is the fixed `#white` overlay.
 - Input comes from an off-screen `<input>` so the mobile keyboard opens;
   any tap on the page refocuses it.
 - Sound is synthesized with the Web Audio API (per-character printout blip,
