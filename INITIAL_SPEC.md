@@ -1,3 +1,5 @@
+> **Historical version 1.0 snapshot.** This file records the site as of June 1, 2026. Read [CLAUDE.md](CLAUDE.md) for current behavior. The live site is a one-file interactive LOGON terminal. Vanilla JavaScript is allowed in that file. Sound uses the Web Audio API, and the site ships no audio files. The palette is blue phosphor. TIC-TAC-TOE is a hidden command.
+
 # PROTOVISION GAMES
 
 ## Product & Technical Design Document
