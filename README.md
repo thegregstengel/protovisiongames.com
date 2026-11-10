@@ -1,31 +1,11 @@
-# protovisiongames.com
+# Protovision Games
 
-This site is the Protovision Games landing page. It's a WarGames LOGON terminal.
+The screen is nearly black. Faint lines cross it, like an old monitor left on in the dark. Blue letters glow in the corner. A cursor blinks. The prompt says LOGON.
 
-Everything lives in `index.html`.
+This is Protovision Games. The page in front of you is the WarGames logon.
 
-## View the site locally
+Big Bang Smugglers is the studio's game. The other names are part of the show. You can play this one.
 
-Open `index.html` in a browser. No install or build is required.
+Tic-tac-toe is hidden. The game list will not offer it. You have to know to ask.
 
-## Publish the site
-
-GitHub Pages serves the `main` branch. A push to `main` publishes the site.
-
-The custom domain is [protovisiongames.com](https://protovisiongames.com).
-
-## Terminal commands
-
-The terminal recognizes these commands:
-
-- `HELP LOGON`
-- `HELP GAMES`
-- `LIST GAMES`
-- `JOSHUA`
-- `TIC-TAC-TOE`
-
-`TIC-TAC-TOE` is hidden. It isn't on the game list.
-
-## Games
-
-Big Bang Smugglers is the only real link.
+The live site is [protovisiongames.com](https://protovisiongames.com).
